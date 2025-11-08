@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Home, ShoppingCart, User, BookOpen, Users, Bell } from '@/components/Icons';
@@ -13,13 +14,14 @@ import SettingsScreen from '@/components/SettingsScreen';
 import NotificationsScreen from '@/components/NotificationsScreen';
 import Toast from '@/components/Toast';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase';
+import { getUsers, getBooks } from '@/lib/database'; // Import database functions
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
 
 // --- ИНТЕРФЕЙСЫ ---
 interface User {
@@ -116,18 +118,12 @@ export default function App() {
         if (!db) return;
         try {
             setLoading(true);
-            // Загружаем книги для всех пользователей
-            const booksCollection = collection(db, 'books');
-            const booksSnapshot = await getDocs(booksCollection);
-            const booksList = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));
-            setBooks(booksList);
+            const booksList = await getBooks();
+            setBooks(booksList as Book[]);
 
-            // Загружаем пользователей ТОЛЬКО если текущий пользователь - админ
             if (currentUser && currentUser.role === 'admin') {
-                const usersCollection = collection(db, 'users');
-                const usersSnapshot = await getDocs(usersCollection);
-                const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-                setUsers(usersList);
+                const usersList = await getUsers();
+                setUsers(usersList as User[]);
             }
         } catch (error) {
             console.error("Ошибка загрузки данных: ", error);
@@ -137,7 +133,6 @@ export default function App() {
         }
     };
 
-    // Запускаем загрузку данных, когда пользователь вошел в систему
     if (currentUser) {
         fetchInitialData();
     }
@@ -172,7 +167,6 @@ export default function App() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    // Состояния будут сброшены автоматически благодаря useEffect
     setCurrentScreen('home');
     setCart([]);
   };
@@ -212,7 +206,6 @@ export default function App() {
   
   // --- НАСТРОЙКИ и ПРОФИЛЬ ---
   const handleUpdateUser = (updatedUser: User) => {
-    // Обновление в Firebase
     const userDocRef = doc(db, 'users', updatedUser.id);
     setDoc(userDocRef, updatedUser, { merge: true });
     setCurrentUser(updatedUser);

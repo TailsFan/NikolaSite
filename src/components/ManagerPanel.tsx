@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Package, TrendingUp, AlertTriangle, ImageIcon } from './Icons';
+import { addBook, updateBook, deleteBook } from '../lib/database'; // Import database functions
 
 interface Book {
   id: string;
@@ -54,31 +56,37 @@ export default function ManagerPanel({ books, onUpdateBooks, currentUser, showTo
     inStock: ''
   });
 
-  const handleAddBook = () => {
+  const handleAddBook = async () => {
     if (newBook.title && newBook.author && newBook.price) {
-      const book: Book = {
-        id: Date.now().toString(),
-        title: newBook.title,
-        author: newBook.author,
-        price: parseFloat(newBook.price),
-        description: newBook.description,
-        image: newBook.image || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400',
-        genre: newBook.genre,
-        inStock: parseInt(newBook.inStock) || 0,
-        managerId: currentUser.id
-      };
-      onUpdateBooks([...books, book]);
-      setNewBook({
-        title: '',
-        author: '',
-        price: '',
-        description: '',
-        image: '',
-        genre: '',
-        inStock: ''
-      });
-      setShowAddBookModal(false);
-      showToast(`Книга "${newBook.title}" добавлена в каталог`);
+      try {
+        const newBookData = {
+          title: newBook.title,
+          author: newBook.author,
+          price: parseFloat(newBook.price),
+          description: newBook.description,
+          image: newBook.image || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400',
+          genre: newBook.genre,
+          inStock: parseInt(newBook.inStock) || 0,
+          managerId: currentUser.id
+        };
+        const newBookId = await addBook(newBookData);
+        const bookWithId = { ...newBookData, id: newBookId };
+        onUpdateBooks([...books, bookWithId]);
+        setNewBook({
+          title: '',
+          author: '',
+          price: '',
+          description: '',
+          image: '',
+          genre: '',
+          inStock: ''
+        });
+        setShowAddBookModal(false);
+        showToast(`Книга "${newBook.title}" добавлена в каталог`);
+      } catch (error) {
+        showToast('Ошибка при добавлении книги', 'error');
+        console.error("Error adding book: ", error);
+      }
     }
   };
 
@@ -86,19 +94,39 @@ export default function ManagerPanel({ books, onUpdateBooks, currentUser, showTo
     setEditingBook(book);
   };
 
-  const handleUpdateBook = () => {
+  const handleUpdateBook = async () => {
     if (editingBook) {
-      onUpdateBooks(books.map(b => b.id === editingBook.id ? editingBook : b));
-      showToast(`Книга "${editingBook.title}" обновлена`);
-      setEditingBook(null);
+      try {
+        await updateBook(editingBook.id, {
+          title: editingBook.title,
+          author: editingBook.author,
+          price: editingBook.price,
+          description: editingBook.description,
+          image: editingBook.image,
+          genre: editingBook.genre,
+          inStock: editingBook.inStock,
+        });
+        onUpdateBooks(books.map(b => b.id === editingBook.id ? editingBook : b));
+        showToast(`Книга "${editingBook.title}" обновлена`);
+        setEditingBook(null);
+      } catch (error) {
+        showToast('Ошибка при обновлении книги', 'error');
+        console.error("Error updating book: ", error);
+      }
     }
   };
 
-  const handleDeleteBook = (bookId: string) => {
+  const handleDeleteBook = async (bookId: string) => {
     const bookToDelete = books.find(b => b.id === bookId);
     if (confirm('Вы уверены, что хотите удалить эту книгу?')) {
-      onUpdateBooks(books.filter(b => b.id !== bookId));
-      showToast(`Книга "${bookToDelete?.title}" удалена из каталога`);
+      try {
+        await deleteBook(bookId);
+        onUpdateBooks(books.filter(b => b.id !== bookId));
+        showToast(`Книга "${bookToDelete?.title}" удалена из каталога`);
+      } catch (error) {
+        showToast('Ошибка при удалении книги', 'error');
+        console.error("Error deleting book: ", error);
+      }
     }
   };
 

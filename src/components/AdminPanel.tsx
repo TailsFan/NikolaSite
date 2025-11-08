@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, UserCheck, UserX, Crown, Shield, User as UserIcon } from './Icons';
+import { addUser, updateUser, deleteUser } from '../lib/database'; // Import database functions
 
 interface User {
   id: string;
@@ -34,18 +36,24 @@ export default function AdminPanel({ users, onUpdateUsers, currentUser, showToas
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState({ email: '', name: '', role: 'user' as const });
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (newUser.email && newUser.name) {
-      const user: User = {
-        id: Date.now().toString(),
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role
-      };
-      onUpdateUsers([...users, user]);
-      setNewUser({ email: '', name: '', role: 'user' });
-      setShowAddUserModal(false);
-      showToast(`Пользователь ${newUser.name} добавлен`);
+      try {
+        const newUserData = {
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+        };
+        const newUserId = await addUser(newUserData);
+        const userWithId = { ...newUserData, id: newUserId };
+        onUpdateUsers([...users, userWithId]);
+        setNewUser({ email: '', name: '', role: 'user' });
+        setShowAddUserModal(false);
+        showToast(`Пользователь ${newUser.name} добавлен`);
+      } catch (error) {
+        showToast('Ошибка при добавлении пользователя', 'error');
+        console.error("Error adding user: ", error);
+      }
     }
   };
 
@@ -53,23 +61,39 @@ export default function AdminPanel({ users, onUpdateUsers, currentUser, showToas
     setEditingUser(user);
   };
 
-  const handleUpdateUser = () => {
+  const handleUpdateUser = async () => {
     if (editingUser) {
-      onUpdateUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
-      showToast(`Пользователь ${editingUser.name} обновлен`);
-      setEditingUser(null);
+      try {
+        await updateUser(editingUser.id, {
+          email: editingUser.email,
+          name: editingUser.name,
+          role: editingUser.role,
+        });
+        onUpdateUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+        showToast(`Пользователь ${editingUser.name} обновлен`);
+        setEditingUser(null);
+      } catch (error) {
+        showToast('Ошибка при обновлении пользователя', 'error');
+        console.error("Error updating user: ", error);
+      }
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (userId === currentUser.id) {
       showToast('Нельзя удалить себя!', 'error');
       return;
     }
     const userToDelete = users.find(u => u.id === userId);
     if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-      onUpdateUsers(users.filter(u => u.id !== userId));
-      showToast(`Пользователь ${userToDelete?.name} удален`);
+      try {
+        await deleteUser(userId);
+        onUpdateUsers(users.filter(u => u.id !== userId));
+        showToast(`Пользователь ${userToDelete?.name} удален`);
+      } catch (error) {
+        showToast('Ошибка при удалении пользователя', 'error');
+        console.error("Error deleting user: ", error);
+      }
     }
   };
 
